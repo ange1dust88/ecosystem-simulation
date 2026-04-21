@@ -4,6 +4,10 @@ function tempFactor(temp: number): number {
   return Math.max(0, 1 - Math.abs(temp - 20) / 40);
 }
 
+function noise(amount: number = 0.1) {
+  return 1 + (Math.random() * 2 - 1) * amount;
+}
+
 function nextPopulation(
   species: Species,
   all: Species[],
@@ -16,28 +20,37 @@ function nextPopulation(
 
   if (species.role === "plant") {
     const K = 1000 * resourceFactor;
-    pop += species.growthRate * pop * (1 - pop / K) * tf;
+
+    pop += species.growthRate * pop * (1 - pop / K) * tf * noise(0.08);
   }
 
   if (species.role === "herbivore") {
     const plants = all.find((s) => s.role === "plant");
     const predators = all.filter((s) => s.role === "predator");
+
     const plantEffect = plants ? plants.population / 500 : 0;
     const predatorEffect = predators.reduce((sum, p) => sum + p.population, 0);
 
-    pop += species.growthRate * pop * plantEffect * tf;
-    pop -= species.deathRate * pop * (predatorEffect / 200);
+    pop += species.growthRate * pop * plantEffect * tf * noise(0.1);
+
+    pop -= species.deathRate * pop * (predatorEffect / 200) * noise(0.05);
   }
 
   if (species.role === "predator") {
     const herbivores = all.filter((s) => s.role === "herbivore");
+
     const preyEffect = herbivores.reduce((sum, h) => sum + h.population, 0);
 
-    pop += species.growthRate * pop * (preyEffect / 500) * tf;
-    pop -= species.deathRate * pop;
+    pop += species.growthRate * pop * (preyEffect / 500) * tf * noise(0.1);
+
+    pop -= species.deathRate * pop * noise(0.05);
   }
 
-  return Math.max(0, Math.round(pop));
+  const result = Math.round(pop);
+
+  if (result < 2) return 0;
+
+  return result;
 }
 
 export function simulateStep(species: Species[], config: SimConfig): Species[] {

@@ -21,11 +21,19 @@ export type YearSnapshot = {
   species: { id: string; name: string; population: number }[];
 };
 
-export type SimStatus = "idle" | "running" | "done" | "collapsed";
+export type SimStatus = "idle" | "running" | "done" | "collapsed" | "paused";
 
 export type SimState = {
   status: SimStatus;
   currentYear: number;
   species: Species[];
   snapshots: YearSnapshot[];
+};
+
+export type CellType = "empty" | "plant" | "herbivore" | "predator";
+
+export type Cell = {
+  x: number;
+  y: number;
+  type: CellType;
 };

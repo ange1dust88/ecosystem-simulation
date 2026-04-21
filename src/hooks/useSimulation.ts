@@ -1,8 +1,12 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 
 import { simulateStep, isCollapsed } from "../simulation/engine";
 import { DEFAULT_SPECIES } from "../simulation/defaultSpecies";
 import type { SimConfig, SimState, Species } from "../types";
+
+function cloneSpecies(): Species[] {
+  return DEFAULT_SPECIES.map((s) => ({ ...s }));
+}
 
 function makeSnapshot(year: number, species: Species[]) {
   return {
@@ -16,60 +20,92 @@ function makeSnapshot(year: number, species: Species[]) {
 }
 
 export function useSimulation(config: SimConfig) {
+  const initialSpecies = cloneSpecies();
+
   const [state, setState] = useState<SimState>({
     status: "idle",
     currentYear: 0,
-    species: DEFAULT_SPECIES,
-    snapshots: [makeSnapshot(0, DEFAULT_SPECIES)],
+    species: initialSpecies,
+    snapshots: [makeSnapshot(0, initialSpecies)],
   });
 
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const yearRef = useRef(0);
-  const speciesRef = useRef<Species[]>(DEFAULT_SPECIES);
+  const speciesRef = useRef<Species[]>(cloneSpecies());
+
+  useEffect(() => {
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current);
+    };
+  }, []);
 
   const stop = useCallback(() => {
-    if (tickRef.current) clearInterval(tickRef.current);
-    setState((prev) => ({ ...prev, status: "done" }));
+    if (tickRef.current) {
+      clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+
+    setState((prev) => ({
+      ...prev,
+      status: "paused",
+    }));
   }, []);
 
   const start = useCallback(() => {
-    setState((prev) => ({ ...prev, status: "running" }));
+    if (tickRef.current) return;
+
+    setState((prev) => ({
+      ...prev,
+      status: "running",
+    }));
 
     tickRef.current = setInterval(() => {
       yearRef.current += 1;
-      speciesRef.current = simulateStep(speciesRef.current, config);
+
+      const nextSpecies = simulateStep(speciesRef.current, config);
+      speciesRef.current = nextSpecies;
 
       const year = yearRef.current;
-      const species = speciesRef.current;
-      const snapshot = makeSnapshot(year, species);
+      const snapshot = makeSnapshot(year, nextSpecies);
 
       setState((prev) => ({
         ...prev,
         currentYear: year,
-        species,
-        snapshots: [...prev.snapshots, snapshot],
-        status: isCollapsed(species) ? "collapsed" : prev.status,
+        species: nextSpecies,
+        snapshots: [...prev.snapshots.slice(-200), snapshot],
+        status: isCollapsed(nextSpecies) ? "collapsed" : prev.status,
       }));
 
-      if (isCollapsed(speciesRef.current) || yearRef.current >= config.years) {
-        clearInterval(tickRef.current!);
+      if (isCollapsed(nextSpecies) || year >= config.years) {
+        if (tickRef.current) {
+          clearInterval(tickRef.current);
+          tickRef.current = null;
+        }
+
         setState((prev) => ({
           ...prev,
-          status: isCollapsed(speciesRef.current) ? "collapsed" : "done",
+          status: isCollapsed(nextSpecies) ? "collapsed" : "done",
         }));
       }
     }, config.tickMs);
-  }, [config, stop]);
+  }, [config]);
 
   const reset = useCallback(() => {
-    if (tickRef.current) clearInterval(tickRef.current);
+    if (tickRef.current) {
+      clearInterval(tickRef.current);
+      tickRef.current = null;
+    }
+
+    const freshSpecies = cloneSpecies();
+
     yearRef.current = 0;
-    speciesRef.current = DEFAULT_SPECIES;
+    speciesRef.current = freshSpecies;
+
     setState({
       status: "idle",
       currentYear: 0,
-      species: DEFAULT_SPECIES,
-      snapshots: [makeSnapshot(0, DEFAULT_SPECIES)],
+      species: freshSpecies,
+      snapshots: [makeSnapshot(0, freshSpecies)],
     });
   }, []);
 

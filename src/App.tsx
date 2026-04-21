@@ -1,18 +1,51 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSimulation } from "./hooks/useSimulation";
 import { DEFAULT_CONFIG, DEFAULT_SPECIES } from "./simulation/defaultSpecies";
 import type { SimConfig } from "./types";
+import { createWorld } from "./simulation/grid";
+import { worldStep } from "./simulation/worldStep";
+import EcosystemMap from "./components/EcosystemMap";
+import { createGridFromSpecies } from "./simulation/gridFromSpecies";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
+
+const COLORS: Record<string, string> = {
+  grass: "#22c55e",
+  rabbit: "#f59e0b",
+  fox: "#ef4444",
+};
 
 export default function App() {
   const [config, setConfig] = useState<SimConfig>(DEFAULT_CONFIG);
   const { state, start, stop, reset } = useSimulation(config);
 
   const { status, currentYear, species, snapshots } = state;
+  const grid = createGridFromSpecies(40, species);
+
+  const chartData = snapshots.map((snap) => {
+    const row: any = { year: snap.year };
+
+    snap.species.forEach((s) => {
+      row[s.id] = s.population;
+    });
+
+    return row;
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
+      {" "}
       <h1 className="text-2xl font-semibold mb-6">Симулятор экосистемы</h1>
-
+      ```
+      {/* CONFIG */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-sm text-gray-500">
           Температура: {config.temperature}°C
@@ -27,6 +60,7 @@ export default function App() {
             disabled={status === "running"}
           />
         </label>
+
         <label className="flex flex-col gap-1 text-sm text-gray-500">
           Ресурсы: {config.resources}/10
           <input
@@ -40,6 +74,7 @@ export default function App() {
             disabled={status === "running"}
           />
         </label>
+
         <label className="flex flex-col gap-1 text-sm text-gray-500">
           Лет: {config.years}
           <input
@@ -54,6 +89,7 @@ export default function App() {
             disabled={status === "running"}
           />
         </label>
+
         <label className="flex flex-col gap-1 text-sm text-gray-500">
           Скорость: {config.tickMs}мс/год
           <input
@@ -69,7 +105,7 @@ export default function App() {
           />
         </label>
       </div>
-
+      {/* CONTROLS */}
       <div className="flex gap-3 mb-6">
         <button
           onClick={start}
@@ -78,6 +114,7 @@ export default function App() {
         >
           Запустить
         </button>
+
         <button
           onClick={stop}
           disabled={status !== "running"}
@@ -85,12 +122,14 @@ export default function App() {
         >
           Стоп
         </button>
+
         <button
           onClick={reset}
           className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
         >
           Сброс
         </button>
+
         <span
           className={`ml-auto text-sm font-medium px-3 py-2 rounded-lg ${
             status === "collapsed"
@@ -111,11 +150,12 @@ export default function App() {
                 : "Коллапс экосистемы"}
         </span>
       </div>
-
+      {/* CURRENT POPULATIONS */}
       <div className="bg-white rounded-xl border border-gray-200 mb-6">
         <div className="px-6 py-4 border-b border-gray-100 text-sm font-medium">
           Текущие популяции
         </div>
+
         <table className="w-full text-sm">
           <thead>
             <tr className="text-gray-400 text-xs">
@@ -124,13 +164,17 @@ export default function App() {
               <th className="text-right px-6 py-3">Популяция</th>
             </tr>
           </thead>
+
           <tbody>
             {species.map((s) => (
               <tr key={s.id} className="border-t border-gray-50">
                 <td className="px-6 py-3 font-medium">{s.name}</td>
                 <td className="px-6 py-3 text-gray-400">{s.role}</td>
+
                 <td
-                  className={`px-6 py-3 text-right font-mono ${s.population === 0 ? "text-red-500" : ""}`}
+                  className={`px-6 py-3 text-right font-mono ${
+                    s.population === 0 ? "text-red-500" : ""
+                  }`}
                 >
                   {s.population === 0 ? "вымер" : s.population.toLocaleString()}
                 </td>
@@ -139,16 +183,18 @@ export default function App() {
           </tbody>
         </table>
       </div>
-
-      <div className="bg-white rounded-xl border border-gray-200">
+      {/* HISTORY TABLE */}
+      <div className="bg-white rounded-xl border border-gray-200 mb-6">
         <div className="px-6 py-4 border-b border-gray-100 text-sm font-medium">
           История по годам
         </div>
+
         <div className="overflow-auto max-h-64">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white">
               <tr className="text-gray-400 text-xs">
                 <th className="text-left px-6 py-3">Год</th>
+
                 {DEFAULT_SPECIES.map((s) => (
                   <th key={s.id} className="text-right px-6 py-3">
                     {s.name}
@@ -156,14 +202,18 @@ export default function App() {
                 ))}
               </tr>
             </thead>
+
             <tbody>
               {[...snapshots].reverse().map((snap) => (
                 <tr key={snap.year} className="border-t border-gray-50">
                   <td className="px-6 py-3 text-gray-400">{snap.year}</td>
+
                   {snap.species.map((s) => (
                     <td
                       key={s.id}
-                      className={`px-6 py-3 text-right font-mono ${s.population === 0 ? "text-red-400" : ""}`}
+                      className={`px-6 py-3 text-right font-mono ${
+                        s.population === 0 ? "text-red-400" : ""
+                      }`}
                     >
                       {s.population === 0 ? "—" : s.population.toLocaleString()}
                     </td>
@@ -173,6 +223,38 @@ export default function App() {
             </tbody>
           </table>
         </div>
+      </div>
+      {/* CHART */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="text-sm font-medium mb-4">Динамика популяций</div>
+
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+
+              <XAxis dataKey="year" />
+
+              <YAxis />
+
+              <Tooltip />
+
+              <Legend />
+
+              {DEFAULT_SPECIES.map((s) => (
+                <Line
+                  key={s.id}
+                  type="monotone"
+                  dataKey={s.id}
+                  stroke={COLORS[s.id]}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <EcosystemMap grid={grid} />
       </div>
     </div>
   );
