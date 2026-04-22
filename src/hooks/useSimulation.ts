@@ -1,37 +1,64 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-
-import { simulateStep, isCollapsed } from "../simulation/engine";
-import { DEFAULT_SPECIES } from "../simulation/defaultSpecies";
+import { worldStep, countPopulations } from "../simulation/worldStep";
+import { createGridFromSpecies } from "../simulation/gridFromSpecies";
 import type { SimConfig, SimState, Species } from "../types";
+import type { CellType } from "../simulation/worldStep";
 
-function cloneSpecies(): Species[] {
-  return DEFAULT_SPECIES.map((s) => ({ ...s }));
-}
+const GRID_SIZE = 60;
 
-function makeSnapshot(year: number, species: Species[]) {
+function makeSnapshot(
+  year: number,
+  counts: ReturnType<typeof countPopulations>,
+  species: Species[],
+) {
   return {
     year,
     species: species.map((s) => ({
       id: s.id,
       name: s.name,
-      population: s.population,
+      population:
+        s.role === "plant"
+          ? counts.plant
+          : s.role === "herbivore"
+            ? counts.herbivore
+            : counts.predator,
     })),
   };
 }
 
-export function useSimulation(config: SimConfig) {
-  const initialSpecies = cloneSpecies();
+function speciesToCurrent(
+  species: Species[],
+  counts: ReturnType<typeof countPopulations>,
+): Species[] {
+  return species.map((s) => ({
+    ...s,
+    population:
+      s.role === "plant"
+        ? counts.plant
+        : s.role === "herbivore"
+          ? counts.herbivore
+          : counts.predator,
+  }));
+}
 
+export function useSimulation(config: SimConfig, initialSpecies: Species[]) {
+  const initGrid = () => createGridFromSpecies(GRID_SIZE, initialSpecies);
+  const initCounts = (grid: CellType[][]) => countPopulations(grid);
+
+  const firstGrid = initGrid();
+  const firstCounts = initCounts(firstGrid);
+
+  const [grid, setGrid] = useState<CellType[][]>(firstGrid);
   const [state, setState] = useState<SimState>({
     status: "idle",
     currentYear: 0,
-    species: initialSpecies,
-    snapshots: [makeSnapshot(0, initialSpecies)],
+    species: speciesToCurrent(initialSpecies, firstCounts),
+    snapshots: [makeSnapshot(0, firstCounts, initialSpecies)],
   });
 
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const yearRef = useRef(0);
-  const speciesRef = useRef<Species[]>(cloneSpecies());
+  const gridRef = useRef<CellType[][]>(firstGrid);
 
   useEffect(() => {
     return () => {
@@ -44,70 +71,72 @@ export function useSimulation(config: SimConfig) {
       clearInterval(tickRef.current);
       tickRef.current = null;
     }
-
-    setState((prev) => ({
-      ...prev,
-      status: "paused",
-    }));
+    setState((prev) => ({ ...prev, status: "paused" }));
   }, []);
 
-  const start = useCallback(() => {
-    if (tickRef.current) return;
+  const start = useCallback(
+    (species: Species[]) => {
+      if (tickRef.current) return;
 
-    setState((prev) => ({
-      ...prev,
-      status: "running",
-    }));
+      setState((prev) => ({ ...prev, status: "running" }));
 
-    tickRef.current = setInterval(() => {
-      yearRef.current += 1;
+      tickRef.current = setInterval(() => {
+        yearRef.current += 1;
+        const year = yearRef.current;
 
-      const nextSpecies = simulateStep(speciesRef.current, config);
-      speciesRef.current = nextSpecies;
+        const nextGrid = worldStep(gridRef.current, config);
+        gridRef.current = nextGrid;
 
-      const year = yearRef.current;
-      const snapshot = makeSnapshot(year, nextSpecies);
+        const counts = countPopulations(nextGrid);
+        const collapsed = counts.herbivore === 0 && counts.predator === 0;
 
-      setState((prev) => ({
-        ...prev,
-        currentYear: year,
-        species: nextSpecies,
-        snapshots: [...prev.snapshots.slice(-200), snapshot],
-        status: isCollapsed(nextSpecies) ? "collapsed" : prev.status,
-      }));
-
-      if (isCollapsed(nextSpecies) || year >= config.years) {
-        if (tickRef.current) {
-          clearInterval(tickRef.current);
-          tickRef.current = null;
-        }
-
+        setGrid(nextGrid);
         setState((prev) => ({
           ...prev,
-          status: isCollapsed(nextSpecies) ? "collapsed" : "done",
+          currentYear: year,
+          species: speciesToCurrent(species, counts),
+          snapshots: [
+            ...prev.snapshots.slice(-200),
+            makeSnapshot(year, counts, species),
+          ],
+          status: collapsed ? "collapsed" : prev.status,
         }));
-      }
-    }, config.tickMs);
-  }, [config]);
 
-  const reset = useCallback(() => {
+        if (collapsed || year >= config.years) {
+          if (tickRef.current) {
+            clearInterval(tickRef.current);
+            tickRef.current = null;
+          }
+          setState((prev) => ({
+            ...prev,
+            status: collapsed ? "collapsed" : "done",
+          }));
+        }
+      }, config.tickMs);
+    },
+    [config],
+  );
+
+  const reset = useCallback((species: Species[]) => {
     if (tickRef.current) {
       clearInterval(tickRef.current);
       tickRef.current = null;
     }
 
-    const freshSpecies = cloneSpecies();
+    const newGrid = createGridFromSpecies(GRID_SIZE, species);
+    const counts = countPopulations(newGrid);
 
     yearRef.current = 0;
-    speciesRef.current = freshSpecies;
+    gridRef.current = newGrid;
 
+    setGrid(newGrid);
     setState({
       status: "idle",
       currentYear: 0,
-      species: freshSpecies,
-      snapshots: [makeSnapshot(0, freshSpecies)],
+      species: speciesToCurrent(species, counts),
+      snapshots: [makeSnapshot(0, counts, species)],
     });
   }, []);
 
-  return { state, start, stop, reset };
+  return { state, grid, start, stop, reset };
 }

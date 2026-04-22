@@ -13,17 +13,17 @@ export const DEFAULT_SPECIES: Species[] = [
     id: "rabbit",
     name: "Rabbits",
     role: "herbivore",
-    population: 150,
-    growthRate: 0.3,
-    deathRate: 0.1,
+    population: 300,
+    growthRate: 0.35,
+    deathRate: 0.08,
   },
   {
     id: "fox",
     name: "Foxes",
     role: "predator",
-    population: 30,
-    growthRate: 0.2,
-    deathRate: 0.15,
+    population: 15,
+    growthRate: 0.15,
+    deathRate: 0.12,
   },
 ];
 

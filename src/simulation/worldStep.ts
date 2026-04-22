@@ -1,65 +1,108 @@
-import type { Cell } from "../types";
+import type { SimConfig } from "../types";
 
-function neighbors(grid: Cell[][], x: number, y: number) {
-  const dirs = [
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1],
-  ];
+export type CellType = "empty" | "plant" | "herbivore" | "predator";
 
-  const result: Cell[] = [];
-
-  for (const [dx, dy] of dirs) {
-    const nx = x + dx;
-    const ny = y + dy;
-
-    if (grid[ny]?.[nx]) result.push(grid[ny][nx]);
-  }
-
-  return result;
+function tempFactor(temp: number): number {
+  return Math.max(0.1, 1 - Math.abs(temp - 20) / 40);
 }
 
-export function worldStep(grid: Cell[][]): Cell[][] {
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function getNeighbors(
+  grid: CellType[][],
+  x: number,
+  y: number,
+  type?: CellType,
+): { x: number; y: number }[] {
   const size = grid.length;
+  const dirs = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+  ];
+  return shuffle(
+    dirs
+      .map(([dx, dy]) => ({ x: x + dx, y: y + dy }))
+      .filter((p) => p.x >= 0 && p.y >= 0 && p.x < size && p.y < size)
+      .filter((p) => !type || grid[p.y][p.x] === type),
+  );
+}
 
-  const next = grid.map((row) => row.map((c) => ({ ...c })));
+export function worldStep(grid: CellType[][], config: SimConfig): CellType[][] {
+  const size = grid.length;
+  const next = grid.map((row) => [...row]);
+  const tf = tempFactor(config.temperature);
+  const rf = config.resources / 10;
 
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const cell = grid[y][x];
-      const n = neighbors(grid, x, y);
+  const coords = shuffle(
+    Array.from({ length: size * size }, (_, i) => ({
+      x: i % size,
+      y: Math.floor(i / size),
+    })),
+  );
 
-      if (cell.type === "plant") {
-        if (Math.random() < 0.02) {
-          const empty = n.find((c) => c.type === "empty");
-          if (empty) next[empty.y][empty.x].type = "plant";
-        }
+  for (const { x, y } of coords) {
+    const cell = grid[y][x];
+    if (cell === "plant") {
+      if (Math.random() < 0.18 * tf * rf) {
+        const empty = getNeighbors(next, x, y, "empty")[0];
+        if (empty) next[empty.y][empty.x] = "plant";
       }
+    }
 
-      if (cell.type === "herbivore") {
-        const plant = n.find((c) => c.type === "plant");
-
-        if (plant) {
-          next[plant.y][plant.x].type = "herbivore";
-          next[y][x].type = "empty";
-        } else {
-          if (Math.random() < 0.05) next[y][x].type = "empty";
+    if (cell === "herbivore") {
+      const food = getNeighbors(grid, x, y, "plant")[0];
+      if (food) {
+        next[food.y][food.x] = "herbivore";
+        next[y][x] = "empty";
+        if (Math.random() < 0.45 * tf) {
+          const empty = getNeighbors(next, x, y, "empty")[0];
+          if (empty) next[empty.y][empty.x] = "herbivore";
         }
+      } else {
+        if (Math.random() < 0.06) next[y][x] = "empty";
       }
+    }
 
-      if (cell.type === "predator") {
-        const prey = n.find((c) => c.type === "herbivore");
-
-        if (prey) {
-          next[prey.y][prey.x].type = "predator";
-          next[y][x].type = "empty";
-        } else {
-          if (Math.random() < 0.08) next[y][x].type = "empty";
+    if (cell === "predator") {
+      const prey = getNeighbors(grid, x, y, "herbivore")[0];
+      if (prey) {
+        next[prey.y][prey.x] = "predator";
+        next[y][x] = "empty";
+        if (Math.random() < 0.3 * tf) {
+          const empty = getNeighbors(next, x, y, "empty")[0];
+          if (empty) next[empty.y][empty.x] = "predator";
         }
+      } else {
+        if (Math.random() < 0.04) next[y][x] = "empty";
       }
     }
   }
 
   return next;
+}
+
+export function countPopulations(grid: CellType[][]) {
+  let plant = 0,
+    herbivore = 0,
+    predator = 0;
+  for (const row of grid) {
+    for (const cell of row) {
+      if (cell === "plant") plant++;
+      else if (cell === "herbivore") herbivore++;
+      else if (cell === "predator") predator++;
+    }
+  }
+  return { plant, herbivore, predator };
 }
