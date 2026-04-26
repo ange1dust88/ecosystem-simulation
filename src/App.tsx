@@ -132,43 +132,21 @@ export default function App() {
                 </span>
               </div>
               <label className="flex flex-col gap-1 text-xs text-gray-400">
-                Population: {s.population}
+                Starting population: {s.population}
                 <input
                   type="range"
                   min={10}
-                  max={1000}
+                  max={
+                    s.role === "plant"
+                      ? 2000
+                      : s.role === "herbivore"
+                        ? 500
+                        : 100
+                  }
                   step={10}
                   value={s.population}
                   onChange={(e) =>
                     updateSpecies(s.id, "population", +e.target.value)
-                  }
-                  disabled={status === "running"}
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-gray-400">
-                Growth rate: {s.growthRate}
-                <input
-                  type="range"
-                  min={0.05}
-                  max={0.8}
-                  step={0.05}
-                  value={s.growthRate}
-                  onChange={(e) =>
-                    updateSpecies(s.id, "growthRate", +e.target.value)
-                  }
-                  disabled={status === "running"}
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-gray-400">
-                Death rate: {s.deathRate}
-                <input
-                  type="range"
-                  min={0.01}
-                  max={0.5}
-                  step={0.01}
-                  value={s.deathRate}
-                  onChange={(e) =>
-                    updateSpecies(s.id, "deathRate", +e.target.value)
                   }
                   disabled={status === "running"}
                 />

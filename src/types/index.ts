@@ -5,10 +5,7 @@ export type Species = {
   name: string;
   role: Role;
   population: number;
-  growthRate: number;
-  deathRate: number;
 };
-
 export type SimConfig = {
   temperature: number;
   resources: number;
@@ -37,3 +34,7 @@ export type Cell = {
   y: number;
   type: CellType;
 };
+
+//rozklady liczb losowych opisac, 2+
+//analisa statystyki
+//wnioski
