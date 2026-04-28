@@ -1,5 +1,9 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-import { worldStep, countPopulations } from "../simulation/worldStep";
+import {
+  worldStep,
+  countPopulations,
+  clearWorldState,
+} from "../simulation/worldStep";
 import { createGridFromSpecies } from "../simulation/gridFromSpecies";
 import type { SimConfig, SimState, Species } from "../types";
 import type { CellType } from "../simulation/worldStep";
@@ -42,23 +46,22 @@ function speciesToCurrent(
 }
 
 export function useSimulation(config: SimConfig, initialSpecies: Species[]) {
-  const initGrid = () => createGridFromSpecies(GRID_SIZE, initialSpecies);
-  const initCounts = (grid: CellType[][]) => countPopulations(grid);
-
-  const firstGrid = initGrid();
-  const firstCounts = initCounts(firstGrid);
-
-  const [grid, setGrid] = useState<CellType[][]>(firstGrid);
-  const [state, setState] = useState<SimState>({
-    status: "idle",
-    currentYear: 0,
-    species: speciesToCurrent(initialSpecies, firstCounts),
-    snapshots: [makeSnapshot(0, firstCounts, initialSpecies)],
+  const [grid, setGrid] = useState<CellType[][]>(() =>
+    createGridFromSpecies(GRID_SIZE, initialSpecies),
+  );
+  const [state, setState] = useState<SimState>(() => {
+    const counts = countPopulations(grid);
+    return {
+      status: "idle",
+      currentYear: 0,
+      species: speciesToCurrent(initialSpecies, counts),
+      snapshots: [makeSnapshot(0, counts, initialSpecies)],
+    };
   });
 
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const yearRef = useRef(0);
-  const gridRef = useRef<CellType[][]>(firstGrid);
+  const gridRef = useRef<CellType[][]>(grid);
 
   useEffect(() => {
     return () => {
@@ -96,7 +99,7 @@ export function useSimulation(config: SimConfig, initialSpecies: Species[]) {
           currentYear: year,
           species: speciesToCurrent(species, counts),
           snapshots: [
-            ...prev.snapshots.slice(-200),
+            ...prev.snapshots,
             makeSnapshot(year, counts, species),
           ],
           status: collapsed ? "collapsed" : prev.status,
@@ -123,6 +126,7 @@ export function useSimulation(config: SimConfig, initialSpecies: Species[]) {
       tickRef.current = null;
     }
 
+    clearWorldState();
     const newGrid = createGridFromSpecies(GRID_SIZE, species);
     const counts = countPopulations(newGrid);
 

@@ -8,6 +8,13 @@ const predatorDirs = new Map<string, { dx: number; dy: number }>();
 const herbivoreEnergy = new Map<string, number>();
 const plantHealth = new Map<string, number>();
 
+export function clearWorldState() {
+  predatorEnergy.clear();
+  predatorDirs.clear();
+  herbivoreEnergy.clear();
+  plantHealth.clear();
+}
+
 const PREDATOR = {
   energyStart: 100,
   energyPerTick: 3,

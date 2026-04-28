@@ -15,20 +15,28 @@ export default function EcosystemMap({ grid }: { grid: CellType[][] }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const size = grid.length;
-    const cell = Math.floor(canvas.offsetWidth / size);
-    canvas.width = cell * size;
-    canvas.height = cell * size;
+    const draw = () => {
+      const size = grid.length;
+      const cell = Math.max(1, Math.floor(canvas.offsetWidth / size));
+      canvas.width = cell * size;
+      canvas.height = cell * size;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        ctx.fillStyle = COLORS[grid[y][x]];
-        ctx.fillRect(x * cell, y * cell, cell, cell);
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          ctx.fillStyle = COLORS[grid[y][x]];
+          ctx.fillRect(x * cell, y * cell, cell, cell);
+        }
       }
-    }
+    };
+
+    draw();
+
+    const observer = new ResizeObserver(draw);
+    observer.observe(canvas);
+    return () => observer.disconnect();
   }, [grid]);
 
   return (

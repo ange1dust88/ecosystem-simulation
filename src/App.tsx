@@ -162,14 +162,14 @@ export default function App() {
           disabled={status === "running"}
           className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm disabled:opacity-40"
         >
-          Start
+          {status === "paused" ? "Resume" : "Start"}
         </button>
         <button
           onClick={stop}
           disabled={status !== "running"}
           className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-40"
         >
-          Stop
+          Pause
         </button>
         <button
           onClick={() => {
@@ -199,7 +199,7 @@ export default function App() {
               : status === "done"
                 ? `Done (${currentYear} years)`
                 : status === "paused"
-                  ? `Stopped (year ${currentYear})`
+                  ? `Paused (year ${currentYear})`
                   : "Ecosystem collapsed"}
         </span>
       </div>
